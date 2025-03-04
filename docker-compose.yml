@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - JWT_SECRET=hyakki_isekai_secret_key_production
+      - VITE_API_URL=https://api.yukkurinet.com/api
+      - DISCORD_CLIENT_ID=1318895201309294624
+      - DISCORD_CLIENT_SECRET=SLZOWu6ZGFN-du3J4C_Uk6ivnVZylkop
+      - DISCORD_CALLBACK_URL=https://api.yukkurinet.com/api/auth/discord/callback
+      - SESSION_SECRET=hyakki_isekai_session_secret_production
+      - DATABASE_URL=file:/app/prisma/prod.db
+      - REDIS_URL=redis://redis:6379
+    volumes:
+      - ./uploads:/app/uploads
+      - ./prisma:/app/prisma
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+    restart: always
+    networks:
+      - hyakki-network
+
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: always
+    networks:
+      - hyakki-network
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/ssl:/etc/nginx/ssl
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    depends_on:
+      - app
+    restart: always
+    networks:
+      - hyakki-network
+
+  certbot:
+    image: certbot/certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+    networks:
+      - hyakki-network
+
+volumes:
+  redis-data:
+
+networks:
+  hyakki-network:
+    driver: bridge
